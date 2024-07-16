@@ -74,7 +74,7 @@ bool lex_single(tokens_t *current, const char *source, size_t *i) {
 tokens_t *tokens_new(void) {
     tokens_t *tokens = malloc(sizeof(tokens_t));
     if (tokens == NULL) {
-        ERROR("couldn't malloc token", NULL);
+        ERROR("couldn't malloc token");
         return NULL;
     }
 

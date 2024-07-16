@@ -7,7 +7,7 @@
 top_t *ast_new(void) {
     top_t *ast = malloc(sizeof(top_t));
     if (ast == NULL) {
-        ERROR("couldn't malloc ast", NULL);
+        ERROR("couldn't malloc ast");
         return NULL;
     }
 
@@ -20,7 +20,7 @@ top_t *ast_new(void) {
 bool parse_single(top_t *current, tokens_t *tokens) {
     (void)current;
     (void)tokens;
-    ERROR("todo: implement parsing", NULL);
+    ERROR("todo: implement parsing");
     return false;
 }
 

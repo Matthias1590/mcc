@@ -9,7 +9,7 @@
 sb_t *sb_new(void) {
     sb_t *sb = malloc(sizeof(sb_t));
     if (sb == NULL) {
-        ERROR("couldn't malloc string builder", NULL);
+        ERROR("couldn't malloc string builder");
         return NULL;
     }
 
@@ -18,7 +18,7 @@ sb_t *sb_new(void) {
 
     sb->string = malloc(sizeof(char) * 1);
     if (sb->string == NULL) {
-        ERROR("couldn't malloc string for string builder", NULL);
+        ERROR("couldn't malloc string for string builder");
         free(sb);
         return NULL;
     }
