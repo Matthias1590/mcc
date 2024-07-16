@@ -1,3 +1,3 @@
 #!/bin/bash
 
-clear; make && (./bin/mcc; echo $?)
+clear; make && valgrind -q --leak-check=full ./bin/mcc
