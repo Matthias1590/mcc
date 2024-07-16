@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.txt": "harbour",
+        "*.spec": "json",
+        "stdbool.h": "c",
+        "ctype.h": "c",
+        "sb.h": "c",
+        "lex.h": "c"
+    }
+}

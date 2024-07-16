@@ -1,8 +1,11 @@
-SRCS=$(wildcard src/*.asm)
-OBJS=$(patsubst src/%.asm, bin/%.o, $(SRCS))
+CC=cc
+CFLAGS=-Wall -Wextra -Werror -I./src -gdwarf-4
+
+SRCS=$(wildcard src/*.c)
+OBJS=$(patsubst src/%.c, bin/%.o, $(SRCS))
 
 bin/mcc: $(OBJS)
-	ld -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
-bin/%.o: src/%.asm
-	nasm -g -f elf64 -I./src -o $@ $^
+bin/%.o: src/%.c
+	$(CC) $(CFLAGS) -c -o $@ $^
