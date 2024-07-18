@@ -10,6 +10,7 @@ typedef enum {
 
 typedef enum {
     PRIMITIVE_INT,
+    PRIMITIVE_BOOL,
     PRIMITIVE_VOID,
 } type_primitive_t;
 
@@ -66,6 +67,8 @@ typedef enum {
     STMT_NONE,
     STMT_BLOCK,
     STMT_RETURN,
+    STMT_VAR_DECL,
+    STMT_ASSIGN,
 } stmt_type_t;
 
 struct stmt_t;
@@ -78,12 +81,26 @@ typedef struct {
     expr_t *value;
 } stmt_return_t;
 
+typedef struct {
+    type_t type;
+    tokens_t *name;
+    expr_t *value;
+} stmt_var_decl_t;
+
+typedef struct {
+    tokens_t *name; // todo: this should be an "access", "field access", "variable access", "array access", etc., not just a name
+    expr_t *value;
+    type_t cached_type;
+} stmt_assign_t;
+
 typedef struct stmt_t {
     struct stmt_t *next;
     stmt_type_t type;
     union {
         stmt_block_t as_block;
         stmt_return_t as_return;
+        stmt_var_decl_t as_var_decl;
+        stmt_assign_t as_assign;
     };
 } stmt_t;
 

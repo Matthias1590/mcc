@@ -10,15 +10,23 @@ void gen_type(type_t type, state_t *state) {
     case TYPE_NONE:
         ERROR("cannot generate type none");
         exit(1);
+        break;
     case TYPE_FUNC:
         ERROR("todo: implement");
         exit(1);
+        break;
     case TYPE_PRIMITIVE:
         switch (type.as_primitive) {
         case PRIMITIVE_VOID:
+            ERROR("cannot generate type void");
+            exit(1);
             break;
         case PRIMITIVE_INT:
             printf("w");
+            break;
+        case PRIMITIVE_BOOL:
+            printf("b");
+            break;
         }
     }
 }
@@ -183,6 +191,35 @@ void gen_return(stmt_return_t *ret, state_t *state) {
     state_dealloc_var(state, var);
 }
 
+void gen_var_decl(stmt_var_decl_t *var_decl, state_t *state) {
+    qbe_var_t expr;
+    if (var_decl->value != NULL) {
+        expr = gen_expr(var_decl->value, state);
+    }
+
+    printf("%%var_%s =", var_decl->name->as_ident.sb->string);
+    gen_type(var_decl->type, state);
+    printf(" copy ");
+
+    if (var_decl->value != NULL) {
+        printf("%%temp_%zu\n", expr);
+
+        state_dealloc_var(state, expr);
+    } else {
+        printf("0\n");
+    }
+}
+
+void gen_assign(stmt_assign_t *assign, state_t *state) {
+    qbe_var_t expr = gen_expr(assign->value, state);
+
+    printf("%%var_%s =", assign->name->as_ident.sb->string);
+    gen_type(assign->cached_type, state);
+    printf(" copy %%temp_%zu\n", expr);
+
+    state_dealloc_var(state, expr);
+}
+
 void gen_stmt(stmt_t *stmt, state_t *state) {
     switch (stmt->type) {
     case STMT_NONE:
@@ -193,6 +230,15 @@ void gen_stmt(stmt_t *stmt, state_t *state) {
     case STMT_RETURN:
         gen_return(&stmt->as_return, state);
         break;
+    case STMT_VAR_DECL:
+        gen_var_decl(&stmt->as_var_decl, state);
+        break;
+    case STMT_ASSIGN:
+        gen_assign(&stmt->as_assign, state);
+        break;
+    default:
+        ERROR("unimplemented %d", stmt->type);
+        exit(1);
     }
 }
 

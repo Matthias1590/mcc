@@ -109,7 +109,7 @@ bool lex_symbol(tokens_t *current, const char *source, size_t *i) {
 }
 
 bool lex_single(tokens_t *current, const char *source, size_t *i) {
-    if (isalpha(source[*i])) {
+    if (isalpha(source[*i]) || source[*i] == '_') {
         return lex_ident(current, source, i);
     }
     if (isdigit(source[*i])) {

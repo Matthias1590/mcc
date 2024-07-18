@@ -122,6 +122,11 @@ bool parse_type(type_t *type, tokens_t **tokens) {
         type->as_primitive = PRIMITIVE_VOID;
         return true;
     }
+    if (strcmp(token->as_ident.sb->string, "_Bool") == 0) {
+        type->type = TYPE_PRIMITIVE;
+        type->as_primitive = PRIMITIVE_BOOL;
+        return true;
+    }
 
     // i just realized, how am i supposed to parse array types, pointers even...
     // theyre part of the variable name, not the type...
@@ -354,6 +359,74 @@ bool parse_block(stmt_t *stmt, tokens_t **tokens) {
     return true;
 }
 
+bool parse_var_decl(stmt_t *stmt, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    stmt->type = STMT_VAR_DECL;
+
+    if (!parse_type(&stmt->as_var_decl.type, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    if (!parse_token(TOKEN_IDENT, &stmt->as_var_decl.name, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    stmt->as_var_decl.value = NULL;
+
+    if (parse_token(TOKEN_ASSIGN, NULL, tokens)) {
+        if (!parse_expr(&stmt->as_var_decl.value, tokens)) {
+            expr_free(stmt->as_var_decl.value);
+            *tokens = start_token;
+            return false;
+        }
+    }
+
+    if (!parse_token(TOKEN_SEMI, NULL, tokens)) {
+        if (stmt->as_var_decl.value != NULL) {
+            expr_free(stmt->as_var_decl.value);
+        }
+        *tokens = start_token;
+        return false;
+    }
+
+    return true;
+}
+
+bool parse_assign(stmt_t *stmt, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    stmt->type = STMT_ASSIGN;
+
+    if (!parse_token(TOKEN_IDENT, &stmt->as_assign.name, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    stmt->as_assign.value = NULL;
+
+    if (!parse_token(TOKEN_ASSIGN, NULL, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    if (!parse_expr(&stmt->as_assign.value, tokens)) {
+        expr_free(stmt->as_assign.value);
+        *tokens = start_token;
+        return false;
+    }
+
+    if (!parse_token(TOKEN_SEMI, NULL, tokens)) {
+        expr_free(stmt->as_assign.value);
+        *tokens = start_token;
+        return false;
+    }
+
+    return true;
+}
+
 bool parse_return(stmt_t *stmt, tokens_t **tokens) {
     tokens_t *start_token = *tokens;
 
@@ -383,6 +456,12 @@ bool parse_return(stmt_t *stmt, tokens_t **tokens) {
 
 bool parse_stmt(stmt_t *stmt, tokens_t **tokens) {
     if (parse_block(stmt, tokens)) {
+        return true;
+    }
+    if (parse_var_decl(stmt, tokens)) {
+        return true;
+    }
+    if (parse_assign(stmt, tokens)) {
         return true;
     }
     if (parse_return(stmt, tokens)) {
@@ -436,6 +515,10 @@ bool parse_func_decl(top_t *current, tokens_t **tokens) {
 }
 
 bool parse_top(top_t *current, tokens_t **tokens) {
+    // todo: find out what path went the furthest (token-wise) and then show its error.
+    // if we almost parsed a full function but the last statement was wrong, we should show
+    // the error of the statement parsing, not "expected function declaration"
+
     tokens_t *start_token = *tokens;
 
     if (parse_func_decl(current, tokens)) {
@@ -443,7 +526,6 @@ bool parse_top(top_t *current, tokens_t **tokens) {
     }
 
     *tokens = start_token;
-    ERROR("expected a function declaration");
     return false;
 }
 
@@ -483,6 +565,8 @@ const char *type_to_string(type_t type) {
             return "int";
         case PRIMITIVE_VOID:
             return "void";
+        case PRIMITIVE_BOOL:
+            return "bool";
         }
     }
 }

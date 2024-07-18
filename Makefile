@@ -23,7 +23,7 @@ qbe-1.2/qbe: qbe-1.2/Makefile
 	make -C qbe-1.2
 
 bin/out.qbe: bin/mcc test.c
-	./bin/mcc > bin/out.qbe
+	./bin/mcc > bin/out.qbe || rm bin/out.qbe
 
 # Mcc
 bin/mcc: $(OBJS)
@@ -32,3 +32,5 @@ bin/mcc: $(OBJS)
 bin/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $^
 
+clean:
+	rm -rf bin/*

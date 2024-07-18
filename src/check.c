@@ -92,6 +92,7 @@ bool state_get(state_t *state, const char *name, type_t *out_type) {
         return state_get(state->parent, name, out_type);
     }
 
+    ERROR("variable '%s' not found", name);
     return false;
 }
 
@@ -120,6 +121,57 @@ void state_dealloc_var(state_t *state, qbe_var_t var) {
     state->vars[var] = false;
 }
 
+// todo: handle type conversions better, pointers are not even taken into account yet and its already wrong
+bool type_is_int_like(type_t type) {
+    if (type.type != TYPE_PRIMITIVE) {
+        return false;
+    }
+
+    switch (type.as_primitive) {
+    case PRIMITIVE_BOOL:
+    case PRIMITIVE_INT:
+        return true;
+    case PRIMITIVE_VOID:
+        return false;
+    }
+}
+
+size_t int_like_type_size(type_t type) {
+    if (type.type != TYPE_PRIMITIVE) {
+        return false;
+    }
+
+    switch (type.as_primitive) {
+    case PRIMITIVE_VOID:
+        return 0;
+    case PRIMITIVE_BOOL:
+        return 1;
+    case PRIMITIVE_INT:
+        return 4;
+    }
+}
+
+type_t promote_int_like_types(type_t lhs, type_t rhs) {
+    if (int_like_type_size(lhs) > int_like_type_size(rhs)) {
+        return lhs;
+    }
+    return rhs;
+}
+
+bool type_is_signed(type_t type) {
+    if (type.type != TYPE_PRIMITIVE) {
+        return false;
+    }
+
+    switch (type.as_primitive) {
+    case PRIMITIVE_BOOL:
+    case PRIMITIVE_VOID:
+        return false;
+    case PRIMITIVE_INT:
+        return true;
+    }
+}
+
 bool type_can_be_converted_to(type_t from, type_t to) {
     if (from.type != to.type) {
         return false;
@@ -138,32 +190,23 @@ bool type_can_be_converted_to(type_t from, type_t to) {
 }
 
 bool type_can_add(type_t lhs, type_t rhs, type_t *out_type) {
-    if (lhs.type != rhs.type) {
+    if (!type_is_int_like(lhs) || !type_is_int_like(rhs)) {
         return false;
     }
 
-    switch (lhs.type) {
-    case TYPE_NONE:
-        return false;
-    case TYPE_PRIMITIVE:
-        // todo: add promotion, same story as in type_can_be_converted_to
-        switch (lhs.as_primitive) {
-        case PRIMITIVE_VOID:
-            return false;
-        case PRIMITIVE_INT:
-            if (out_type != NULL) {
-                out_type->type = TYPE_PRIMITIVE;
-                out_type->as_primitive = PRIMITIVE_INT;
-            }
-            return rhs.as_primitive == PRIMITIVE_INT;
-        }
-    case TYPE_FUNC:
-        // todo: can you add functions?
+    if (type_is_signed(lhs) != type_is_signed(rhs)) {
         return false;
     }
+
+    if (out_type) {
+        *out_type = promote_int_like_types(lhs, rhs);
+    }
+
+    return true;
 }
 
 bool type_can_mult(type_t lhs, type_t rhs, type_t *out_type) {
+
     if (lhs.type != rhs.type) {
         return false;
     }
@@ -176,6 +219,8 @@ bool type_can_mult(type_t lhs, type_t rhs, type_t *out_type) {
         switch (lhs.as_primitive) {
         case PRIMITIVE_VOID:
             return false;
+        case PRIMITIVE_BOOL:
+            return type_is_int_like(rhs);
         case PRIMITIVE_INT:
             if (out_type != NULL) {
                 out_type->type = TYPE_PRIMITIVE;
@@ -202,6 +247,8 @@ bool type_can_compare(type_t lhs, type_t rhs) {
         switch (lhs.as_primitive) {
         case PRIMITIVE_VOID:
             return false;
+        case PRIMITIVE_BOOL:
+            return type_is_int_like(rhs);
         case PRIMITIVE_INT:
             return rhs.as_primitive == PRIMITIVE_INT;
         }
@@ -288,7 +335,6 @@ bool check_compare_binop(state_t *state, expr_binop_t *binop, type_result_t *typ
 
 bool check_var(state_t *state, expr_var_t *var, type_result_t *type_result) {
     if (!state_get(state, var->var->as_ident.sb->string, &type_result->value_type)) {
-        ERROR("variable '%s' not found", var->var->as_ident.sb->string);
         return false;
     }
 
@@ -348,16 +394,55 @@ bool check_return(state_t *state, stmt_return_t ret, type_result_t *type_result)
     return true;
 }
 
+bool check_var_decl(state_t *state, stmt_var_decl_t var_decl, type_result_t *type_result) {
+    if (!state_add(state, var_decl.name->as_ident.sb->string, var_decl.type)) {
+        return false;
+    }
+    if (var_decl.value != NULL) {
+        if (!check_expr(state, var_decl.value, type_result)) {
+            return false;
+        }
+        if (!type_can_be_converted_to(type_result->value_type, var_decl.type)) {
+            ERROR("variable '%s' is of type '%s' but it's initializer is of type '%s'", var_decl.name->as_ident.sb->string, type_to_string(var_decl.type), type_to_string(type_result->value_type));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool check_assign(state_t *state, stmt_assign_t *assign, type_result_t *type_result) {
+    if (!state_get(state, assign->name->as_ident.sb->string, &assign->cached_type)) {
+        return false;
+    }
+    if (!check_expr(state, assign->value, type_result)) {
+        return false;
+    }
+    if (!type_can_be_converted_to(type_result->value_type, assign->cached_type)) {
+        ERROR("variable '%s' is of type '%s' but it's being set to a value of type '%s'", assign->name->as_ident.sb->string, type_to_string(assign->cached_type), type_to_string(type_result->value_type));
+        return false;
+    }
+
+    return true;
+}
+
 bool check_stmt(state_t *state, stmt_t *stmt, type_result_t *type_result) {
     switch (stmt->type) {
     case STMT_NONE:
         return true;
+    case STMT_VAR_DECL:
+       return check_var_decl(state, stmt->as_var_decl, type_result);
     case STMT_BLOCK: {
         state_t *substate = state_new_substate(state);
         return check_block(substate, stmt->as_block, type_result);
     } break;
     case STMT_RETURN:
         return check_return(state, stmt->as_return, type_result);
+    case STMT_ASSIGN:
+        return check_assign(state, &stmt->as_assign, type_result);
+    default:
+        ERROR("unimplemented %d", stmt->type);
+        exit(1);
     }
 }
 
@@ -378,7 +463,10 @@ bool check_func_decl(state_t *state, top_func_decl_t *func_decl) {
         params = params->next;
     }
 
-    type_result_t type_result;
+    type_result_t type_result = {
+        .return_type.type = TYPE_NONE,
+        .value_type.type = TYPE_NONE,
+    };
     if (!check_stmt(substate, func_decl->body, &type_result)) {
         return false;
     }
