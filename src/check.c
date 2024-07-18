@@ -189,6 +189,27 @@ bool type_can_mult(type_t lhs, type_t rhs, type_t *out_type) {
     }
 }
 
+bool type_can_compare(type_t lhs, type_t rhs) {
+    if (lhs.type != rhs.type) {
+        return false;
+    }
+
+    switch (lhs.type) {
+    case TYPE_NONE:
+        return false;
+    case TYPE_PRIMITIVE:
+        // todo: add promotion, same story as in type_can_be_converted_to
+        switch (lhs.as_primitive) {
+        case PRIMITIVE_VOID:
+            return false;
+        case PRIMITIVE_INT:
+            return rhs.as_primitive == PRIMITIVE_INT;
+        }
+    case TYPE_FUNC:
+        return true;
+    }
+}
+
 bool check_stmt(state_t *state, stmt_t *stmt, type_result_t *type_result);
 
 bool check_block(state_t *state, stmt_block_t block, type_result_t *type_result) {
@@ -218,6 +239,7 @@ bool check_add(state_t *state, expr_binop_t *binop, type_result_t *type_result) 
     type_t rhs_type = type_result->value_type;
 
     if (!type_can_add(lhs_type, rhs_type, &type_result->value_type)) {
+        ERROR("can't add values of type '%s' and '%s'", type_to_string(lhs_type), type_to_string(rhs_type));
         return false;
     }
 
@@ -236,14 +258,52 @@ bool check_mult(state_t *state, expr_binop_t *binop, type_result_t *type_result)
     type_t rhs_type = type_result->value_type;
 
     if (!type_can_mult(lhs_type, rhs_type, &type_result->value_type)) {
+        ERROR("can't multiply values of type '%s' and '%s'", type_to_string(lhs_type), type_to_string(rhs_type));
         return false;
     }
 
     return true;
 }
 
+bool check_compare_binop(state_t *state, expr_binop_t *binop, type_result_t *type_result) {
+    if (!check_expr(state, binop->lhs, type_result)) {
+        return false;
+    }
+    type_t lhs_type = type_result->value_type;
+
+    if (!check_expr(state, binop->rhs, type_result)) {
+        return false;
+    }
+    type_t rhs_type = type_result->value_type;
+
+    if (!type_can_compare(lhs_type, rhs_type)) {
+        ERROR("can't compare values of type '%s' and '%s'", type_to_string(lhs_type), type_to_string(rhs_type));
+        return false;
+    }
+
+    type_result->value_type.type = TYPE_PRIMITIVE;
+    type_result->value_type.as_primitive = PRIMITIVE_INT;
+    return true;
+}
+
 bool check_var(state_t *state, expr_var_t *var, type_result_t *type_result) {
-    return state_get(state, var->var->as_ident.sb->string, &type_result->value_type);
+    if (!state_get(state, var->var->as_ident.sb->string, &type_result->value_type)) {
+        ERROR("variable '%s' not found", var->var->as_ident.sb->string);
+        return false;
+    }
+
+    return true;
+}
+
+bool check_int(state_t *state, expr_t *expr, type_result_t *type_result) {
+    (void)state;
+
+    type_result->value_type.type = TYPE_PRIMITIVE;
+    type_result->value_type.as_primitive = PRIMITIVE_INT;
+
+    expr->cached_type = type_result->value_type;
+
+    return true;
 }
 
 bool check_expr(state_t *state, expr_t *expr, type_result_t *type_result) {
@@ -255,11 +315,20 @@ bool check_expr(state_t *state, expr_t *expr, type_result_t *type_result) {
     case EXPR_MULT:
         res = check_mult(state, &expr->as_binop, type_result);
         break;
+    case EXPR_LT:
+    case EXPR_GT:
+    case EXPR_EQ:
+        res = check_compare_binop(state, &expr->as_binop, type_result);
+        break;
     case EXPR_VAR:
         res = check_var(state, &expr->as_var, type_result);
         break;
     case EXPR_INT:
-        return true;  // todo: maybe check int bounds? type_result.value_type could be set to the smallest int type needed to contain the literal
+        res = check_int(state, expr, type_result);
+        break;
+    default:
+        ERROR("unimplemented %d", expr->type);
+        exit(1);
     }
 
     expr->cached_type = type_result->value_type;
@@ -315,6 +384,7 @@ bool check_func_decl(state_t *state, top_func_decl_t *func_decl) {
     }
 
     if (!type_can_be_converted_to(func_decl->return_type, type_result.return_type)) {
+        ERROR("expected function to return '%s' but it returns '%s'", type_to_string(func_decl->return_type), type_to_string(type_result.return_type));
         return false;
     }
 

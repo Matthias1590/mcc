@@ -79,6 +79,54 @@ qbe_var_t gen_mult(expr_binop_t *mult, state_t *state) {
     return res;
 }
 
+qbe_var_t gen_lt(expr_binop_t *lt, state_t *state) {
+    qbe_var_t lhs = gen_expr(lt->lhs, state);
+    qbe_var_t rhs = gen_expr(lt->rhs, state);
+
+    qbe_var_t res = state_alloc_var(state);
+    printf("%%temp_%zu =w ", res);
+
+    // todo: use unsigned comparisons if the types require it
+    printf("csltw %%temp_%zu, %%temp_%zu\n", lhs, rhs);
+
+    state_dealloc_var(state, lhs);
+    state_dealloc_var(state, rhs);
+
+    return res;
+}
+
+qbe_var_t gen_gt(expr_binop_t *gt, state_t *state) {
+    qbe_var_t lhs = gen_expr(gt->lhs, state);
+    qbe_var_t rhs = gen_expr(gt->rhs, state);
+
+    qbe_var_t res = state_alloc_var(state);
+    printf("%%temp_%zu =w ", res);
+
+    // todo: use unsigned comparisons if the types require it
+    printf("csgtw %%temp_%zu, %%temp_%zu\n", lhs, rhs);
+
+    state_dealloc_var(state, lhs);
+    state_dealloc_var(state, rhs);
+
+    return res;
+}
+
+qbe_var_t gen_eq(expr_binop_t *eq, state_t *state) {
+    qbe_var_t lhs = gen_expr(eq->lhs, state);
+    qbe_var_t rhs = gen_expr(eq->rhs, state);
+
+    // todo: maybe return a single byte instead of an int for comparisons?
+    qbe_var_t res = state_alloc_var(state);
+    printf("%%temp_%zu =w ", res);
+
+    printf("ceqw %%temp_%zu, %%temp_%zu\n", lhs, rhs);
+
+    state_dealloc_var(state, lhs);
+    state_dealloc_var(state, rhs);
+
+    return res;
+}
+
 qbe_var_t gen_var(expr_t *var, state_t *state) {
     qbe_var_t res = state_alloc_var(state);
     printf("%%temp_%zu =", res);
@@ -90,16 +138,35 @@ qbe_var_t gen_var(expr_t *var, state_t *state) {
     return res;
 }
 
+qbe_var_t gen_int(expr_t *i, state_t *state) {
+    qbe_var_t res = state_alloc_var(state);
+    printf("%%temp_%zu =", res);
+
+    gen_type(i->cached_type, state);
+
+    printf(" copy %zd\n", i->as_int.token->as_int.value);
+
+    return res;
+}
+
 qbe_var_t gen_expr(expr_t *expr, state_t *state) {
     switch (expr->type) {
     case EXPR_ADD:
         return gen_add(&expr->as_binop, state);
     case EXPR_MULT:
         return gen_mult(&expr->as_binop, state);
+    case EXPR_LT:
+        return gen_lt(&expr->as_binop, state);
+    case EXPR_GT:
+        return gen_gt(&expr->as_binop, state);
+    case EXPR_EQ:
+        return gen_eq(&expr->as_binop, state);
     case EXPR_VAR:
         return gen_var(expr, state);
     case EXPR_INT:
-        ERROR("todo: implement");
+        return gen_int(expr, state);
+    default:
+        ERROR("unimplemented %d", expr->type);
         exit(1);
         return 0;
     }

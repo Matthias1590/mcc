@@ -30,6 +30,19 @@ bool lex_ident(tokens_t *current, const char *source, size_t *i) {
     return true;
 }
 
+bool lex_int(tokens_t *current, const char *source, size_t *i) {
+    current->type = TOKEN_INT;
+
+    current->as_int.value = 0;
+    while (isdigit(source[*i])) {
+        current->as_int.value *= 10;
+        current->as_int.value += source[*i] - '0';
+        (*i)++;
+    }
+
+    return true;
+}
+
 bool lex_symbol(tokens_t *current, const char *source, size_t *i) {
     if (source[*i] == '(') {
         current->type = TOKEN_LPAR;
@@ -71,6 +84,25 @@ bool lex_symbol(tokens_t *current, const char *source, size_t *i) {
         (*i)++;
         return true;
     }
+    if (source[*i] == '>') {
+        current->type = TOKEN_GT;
+        (*i)++;
+        return true;
+    }
+    if (source[*i] == '<') {
+        current->type = TOKEN_LT;
+        (*i)++;
+        return true;
+    }
+    if (source[*i] == '=') {
+        current->type = TOKEN_ASSIGN;
+        (*i)++;
+        if (source[*i] == '=') {
+            current->type = TOKEN_EQ;
+            (*i)++;
+        }
+        return true;
+    }
 
     ERROR("unexpected character '%c'", source[*i]);
     return false;
@@ -79,6 +111,9 @@ bool lex_symbol(tokens_t *current, const char *source, size_t *i) {
 bool lex_single(tokens_t *current, const char *source, size_t *i) {
     if (isalpha(source[*i])) {
         return lex_ident(current, source, i);
+    }
+    if (isdigit(source[*i])) {
+        return lex_int(current, source, i);
     }
     return lex_symbol(current, source, i);
 }
@@ -142,21 +177,8 @@ void tokens_free(tokens_t *tokens) {
         tokens_free(tokens->next);
     }
 
-    switch (tokens->type) {
-        case TOKEN_EOF:
-        case TOKEN_LPAR:
-        case TOKEN_RPAR:
-        case TOKEN_LBRACE:
-        case TOKEN_RBRACE:
-        case TOKEN_COMMA:
-        case TOKEN_PLUS:
-        case TOKEN_SEMI:
-        case TOKEN_STAR:
-        case TOKEN_KW_RETURN:
-            break;
-        case TOKEN_IDENT: {
-            sb_free(&tokens->as_ident.sb);
-        } break;
+    if (tokens->type == TOKEN_IDENT) {
+        sb_free(&tokens->as_ident.sb);
     }
 
     free(tokens);

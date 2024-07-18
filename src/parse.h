@@ -31,6 +31,9 @@ typedef enum {
     EXPR_VAR,
     EXPR_ADD,
     EXPR_MULT,
+    EXPR_LT,
+    EXPR_GT,
+    EXPR_EQ,
 } expr_type_t;
 
 struct expr_t;
@@ -45,12 +48,17 @@ typedef struct {
     tokens_t *var;
 } expr_var_t;
 
+typedef struct {
+    tokens_t *token;
+} expr_int_t;
+
 typedef struct expr_t {
     expr_type_t type;
     type_t cached_type;
     union {
         expr_binop_t as_binop;
         expr_var_t as_var;
+        expr_int_t as_int;
     };
 } expr_t;
 
@@ -107,3 +115,5 @@ typedef struct top_t {
 
 top_t *ast_from_tokens(tokens_t *tokens);
 void ast_free(top_t *ast);
+
+const char *type_to_string(type_t type);

@@ -180,12 +180,19 @@ bool parse_params(params_t *params, tokens_t **tokens) {
 bool parse_term(expr_t **expr, tokens_t **tokens) {
     tokens_t *start_token = *tokens;
 
-    // for now only a variable reference is a term
-    tokens_t *ident;
-    if (parse_token(TOKEN_IDENT, &ident, tokens)) {
+    tokens_t *token;
+    
+    if (parse_token(TOKEN_IDENT, &token, tokens)) {
         *expr = expr_new();
         (*expr)->type = EXPR_VAR;
-        (*expr)->as_var.var = ident;
+        (*expr)->as_var.var = token;
+        return true;
+    }
+
+    if (parse_token(TOKEN_INT, &token, tokens)) {
+        *expr = expr_new();
+        (*expr)->type = EXPR_INT;
+        (*expr)->as_int.token = token;
         return true;
     }
 
@@ -193,12 +200,56 @@ bool parse_term(expr_t **expr, tokens_t **tokens) {
     return false;
 }
 
-bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
+bool parse_compare_op(expr_t **expr, tokens_t **tokens) {
     tokens_t *start_token = *tokens;
 
     // try to parse multiplications, lhs = parse_term(), rhs = parse_term()
     expr_t *lhs;
     if (!parse_term(&lhs, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    while (true) {
+        expr_type_t expr_type;
+
+        tokens_t *op_token = NULL;
+        if (parse_token(TOKEN_LT, &op_token, tokens)) {
+            expr_type = EXPR_LT;
+        } else if (parse_token(TOKEN_GT, &op_token, tokens)) {
+            expr_type = EXPR_GT;
+        } else if (parse_token(TOKEN_EQ, &op_token, tokens)) {
+            expr_type = EXPR_EQ;
+        }
+
+        if (op_token == NULL) {
+            break;
+        }
+
+        expr_t *rhs;
+        if (!parse_term(&rhs, tokens)) {
+            expr_free(lhs);
+            *tokens = start_token;
+            return false;
+        }
+
+        expr_t *temp = expr_new();
+        temp->type = expr_type;
+        temp->as_binop.lhs = lhs;
+        temp->as_binop.rhs = rhs;
+        lhs = temp;
+    }
+
+    *expr = lhs;
+    return true;
+}
+
+bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    // try to parse multiplications, lhs = parse_compare_op(), rhs = parse_compare_op()
+    expr_t *lhs;
+    if (!parse_compare_op(&lhs, tokens)) {
         *tokens = start_token;
         return false;
     }
@@ -213,7 +264,7 @@ bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
         }
 
         expr_t *rhs;
-        if (!parse_term(&rhs, tokens)) {
+        if (!parse_compare_op(&rhs, tokens)) {
             expr_free(lhs);
             *tokens = start_token;
             return false;
@@ -418,4 +469,20 @@ top_t *ast_from_tokens(tokens_t *tokens) {
     }
 
     return ast;
+}
+
+const char *type_to_string(type_t type) {
+    switch (type.type) {
+    case TYPE_NONE:
+        return "none";
+    case TYPE_FUNC:
+        return "function";
+    case TYPE_PRIMITIVE:
+        switch (type.as_primitive) {
+        case PRIMITIVE_INT:
+            return "int";
+        case PRIMITIVE_VOID:
+            return "void";
+        }
+    }
 }
