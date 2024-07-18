@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <string.h>
 #include "sb.h"
 #include "utils.h"
 
@@ -19,6 +20,11 @@ bool lex_ident(tokens_t *current, const char *source, size_t *i) {
         sb_addc(current->as_ident.sb, source[*i]);
         (*i)++;
     }
+
+    if (strcmp(current->as_ident.sb->string, "return") == 0) {
+        current->type = TOKEN_KW_RETURN;
+    }
+    // todo: add more keywords here
 
     return true;
 }
@@ -51,6 +57,11 @@ bool lex_symbol(tokens_t *current, const char *source, size_t *i) {
     }
     if (source[*i] == '+') {
         current->type = TOKEN_PLUS;
+        (*i)++;
+        return true;
+    }
+    if (source[*i] == '*') {
+        current->type = TOKEN_STAR;
         (*i)++;
         return true;
     }
@@ -139,6 +150,8 @@ void tokens_free(tokens_t *tokens) {
         case TOKEN_COMMA:
         case TOKEN_PLUS:
         case TOKEN_SEMI:
+        case TOKEN_STAR:
+        case TOKEN_KW_RETURN:
             break;
         case TOKEN_IDENT: {
             sb_free(tokens->as_ident.sb);

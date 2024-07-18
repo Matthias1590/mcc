@@ -11,7 +11,9 @@ typedef enum {
     TOKEN_RBRACE,
     TOKEN_COMMA,
     TOKEN_PLUS,
+    TOKEN_STAR,
     TOKEN_SEMI,
+    TOKEN_KW_RETURN,
 } token_type_t;
 
 typedef struct {

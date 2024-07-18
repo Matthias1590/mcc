@@ -3,7 +3,34 @@
 #include "lex.h"
 
 typedef enum {
+    EXPR_INT,
+    EXPR_VAR,
+    EXPR_ADD,
+    EXPR_MULT,
+} expr_type_t;
+
+struct expr_t;
+
+typedef struct {
+    struct expr_t *lhs;
+    struct expr_t *rhs;
+} expr_binop_t;
+
+typedef struct {
+    tokens_t *var;
+} expr_var_t;
+
+typedef struct expr_t {
+    expr_type_t type;
+    union {
+        expr_binop_t as_binop;
+        expr_var_t as_var;
+    };
+} expr_t;
+
+typedef enum {
     STMT_BLOCK,
+    STMT_RETURN,
 } stmt_type_t;
 
 struct stmt_t;
@@ -12,9 +39,17 @@ typedef struct {
     struct stmt_t *statements;
 } stmt_block_t;
 
+typedef struct {
+    expr_t *value;
+} stmt_return_t;
+
 typedef struct stmt_t {
     struct stmt_t *next;
     stmt_type_t type;
+    union {
+        stmt_block_t as_block;
+        stmt_return_t as_return;
+    };
 } stmt_t;
 
 typedef enum {

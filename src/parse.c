@@ -5,6 +5,8 @@
 #include <string.h>
 #include "utils.h"
 
+bool parse_stmt(stmt_t *stmt, tokens_t **tokens);
+
 top_t *ast_new(void) {
     top_t *ast = malloc(sizeof(top_t));
     if (ast == NULL) {
@@ -40,6 +42,22 @@ void stmt_free(stmt_t *stmt) {
     }
 
     free(stmt);
+}
+
+expr_t *expr_new(void) {
+    expr_t *expr = malloc(sizeof(expr_t));
+    if (expr == NULL) {
+        ERROR("couldn't malloc expression");
+        return NULL;
+    }
+
+    return expr;
+}
+
+void expr_free(expr_t *expr) {
+    // todo: switch on type
+
+    free(expr);
 }
 
 params_t *params_new(void) {
@@ -122,12 +140,21 @@ bool parse_param(params_t *params, tokens_t **tokens) {
 bool parse_params(params_t *params, tokens_t **tokens) {
     tokens_t *start_token = *tokens;
 
+    bool parsed_param = false;
     while ((*tokens)->type != TOKEN_RPAR) {
+        if (parsed_param) {
+            if (!parse_token(TOKEN_COMMA, NULL, tokens)) {
+                *tokens = start_token;
+                return false;
+            }
+        }
+
         if (!parse_param(params, tokens)) {
             *tokens = start_token;
             return false;
         }
 
+        parsed_param = true;
         params->next = params_new();
         params = params->next;
     }
@@ -135,17 +162,180 @@ bool parse_params(params_t *params, tokens_t **tokens) {
     return true;
 }
 
-bool parse_func_decl(top_t *current, tokens_t **tokens) {
+bool parse_term(expr_t **expr, tokens_t **tokens) {
     tokens_t *start_token = *tokens;
 
-    type_t return_type;
-    if (!parse_type(&return_type, tokens)) {
+    // for now only a variable reference is a term
+    tokens_t *ident;
+    if (parse_token(TOKEN_IDENT, &ident, tokens)) {
+        *expr = expr_new();
+        (*expr)->type = EXPR_VAR;
+        (*expr)->as_var.var = ident;
+        return true;
+    }
+
+    *tokens = start_token;
+    return false;
+}
+
+bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    // try to parse multiplications, lhs = parse_term(), rhs = parse_term()
+    expr_t *lhs;
+    if (!parse_term(&lhs, tokens)) {
         *tokens = start_token;
         return false;
     }
 
-    tokens_t *name;
-    if (!parse_token(TOKEN_IDENT, &name, tokens)) {
+    while (true) {
+        tokens_t *op_token = NULL;
+        parse_token(TOKEN_STAR, &op_token, tokens);
+        // || parse_token(TOKEN_MINUS, &op_token, tokens);
+
+        if (op_token == NULL) {
+            break;
+        }
+
+        expr_t *rhs;
+        if (!parse_term(&rhs, tokens)) {
+            expr_free(lhs);
+            *tokens = start_token;
+            return false;
+        }
+
+        expr_t *temp = expr_new();
+        temp->type = EXPR_MULT;  // todo: switch on op_token->type, dont always assume its a multiplication
+        temp->as_binop.lhs = lhs;
+        temp->as_binop.rhs = rhs;
+        lhs = temp;
+    }
+
+    *expr = lhs;
+    return true;
+}
+
+bool parse_add_op(expr_t **expr, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    // try to parse additions, lhs = parse_mult_op(), rhs = parse_mult_op()
+    expr_t *lhs;
+    if (!parse_mult_op(&lhs, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    while (true) {
+        tokens_t *op_token = NULL;
+        parse_token(TOKEN_PLUS, &op_token, tokens);
+        // || parse_token(TOKEN_MINUS, &op_token, tokens);
+
+        if (op_token == NULL) {
+            break;
+        }
+
+        expr_t *rhs;
+        if (!parse_mult_op(&rhs, tokens)) {
+            expr_free(lhs);
+            *tokens = start_token;
+            return false;
+        }
+
+        expr_t *temp = expr_new();
+        temp->type = EXPR_ADD;  // todo: switch on op_token->type, dont always assume its an addition
+        temp->as_binop.lhs = lhs;
+        temp->as_binop.rhs = rhs;
+        lhs = temp;
+    }
+
+    *expr = lhs;
+    return true;
+}
+
+bool parse_expr(expr_t **expr, tokens_t **tokens) {
+    return parse_add_op(expr, tokens);
+}
+
+bool parse_block(stmt_t *stmt, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    if (!parse_token(TOKEN_LBRACE, NULL, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    stmt->type = STMT_BLOCK;
+    stmt->as_block.statements = stmt_new();
+
+    stmt_t *inner = stmt->as_block.statements;
+    while ((*tokens)->type != TOKEN_RBRACE) {
+        if (!parse_stmt(inner, tokens)) {
+            stmt_free(stmt->as_block.statements);
+            *tokens = start_token;
+            return false;
+        }
+
+        inner->next = stmt_new();
+        inner = inner->next;
+    }
+
+    if (!parse_token(TOKEN_RBRACE, NULL, tokens)) {
+        stmt_free(stmt->as_block.statements);
+        *tokens = start_token;
+        return false;
+    }
+
+    return true;
+}
+
+bool parse_return(stmt_t *stmt, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    if (!parse_token(TOKEN_KW_RETURN, NULL, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    stmt->type = STMT_RETURN;
+
+    if (!parse_expr(&stmt->as_return.value, tokens)) {
+        expr_free(stmt->as_return.value);
+        stmt->as_return.value = NULL;
+    }
+
+    if (!parse_token(TOKEN_SEMI, NULL, tokens)) {
+        if (stmt->as_return.value != NULL) {
+            expr_free(stmt->as_return.value);
+            stmt->as_return.value = NULL;
+        }
+        *tokens = start_token;
+        return false;
+    }
+
+    return true;
+}
+
+bool parse_stmt(stmt_t *stmt, tokens_t **tokens) {
+    if (parse_block(stmt, tokens)) {
+        return true;
+    }
+    if (parse_return(stmt, tokens)) {
+        return true;
+    }
+    return false;
+}
+
+bool parse_func_decl(top_t *current, tokens_t **tokens) {
+    tokens_t *start_token = *tokens;
+
+    current->type = TOP_FUNC_DECL;
+
+    if (!parse_type(&current->as_func_decl.return_type, tokens)) {
+        *tokens = start_token;
+        return false;
+    }
+
+    if (!parse_token(TOKEN_IDENT, &current->as_func_decl.name, tokens)) {
         *tokens = start_token;
         return false;
     }
@@ -155,32 +345,26 @@ bool parse_func_decl(top_t *current, tokens_t **tokens) {
         return false;
     }
 
-    params_t *params = params_new();
-    if (!parse_params(params, tokens)) {
-        params_free(params);
+    current->as_func_decl.params = params_new();
+    if (!parse_params(current->as_func_decl.params, tokens)) {
+        params_free(current->as_func_decl.params);
         *tokens = start_token;
         return false;
     }
 
     if (!parse_token(TOKEN_RPAR, NULL, tokens)) {
-        params_free(params);
+        params_free(current->as_func_decl.params);
         *tokens = start_token;
         return false;
     }
 
-    stmt_t *body = stmt_new();
-    if (!parse_block(body, tokens)) {
-        params_free(params);
-        stmt_free(body);
+    current->as_func_decl.body = stmt_new();
+    if (!parse_block(current->as_func_decl.body, tokens)) {
+        params_free(current->as_func_decl.params);
+        stmt_free(current->as_func_decl.body);
         *tokens = start_token;
         return false;
     }
-
-    current->type = TOP_FUNC_DECL;
-    current->as_func_decl.return_type = return_type;
-    current->as_func_decl.name = name;
-    current->as_func_decl.params = params;
-    current->as_func_decl.body = body;
 
     return true;
 }

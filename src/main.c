@@ -2,6 +2,7 @@
 #include "sb.h"
 #include "lex.h"
 #include "parse.h"
+#include "check.h"
 
 int main(void) {
     tokens_t *tokens = tokens_from_file("test.c");
@@ -16,6 +17,8 @@ int main(void) {
     // }
 
     top_t *ast = ast_from_tokens(tokens);
+
+    check_ast(ast);
 
     ast_free(ast);
     tokens_free(tokens);
