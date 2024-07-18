@@ -3,6 +3,21 @@
 #include "lex.h"
 
 typedef enum {
+    STMT_BLOCK,
+} stmt_type_t;
+
+struct stmt_t;
+
+typedef struct {
+    struct stmt_t *statements;
+} stmt_block_t;
+
+typedef struct stmt_t {
+    struct stmt_t *next;
+    stmt_type_t type;
+} stmt_t;
+
+typedef enum {
     TYPE_PRIMITIVE,
 } type_type_t;
 
@@ -27,6 +42,7 @@ typedef struct {
     type_t return_type;
     tokens_t *name;
     params_t *params;
+    stmt_t *body;
 } top_func_decl_t;
 
 typedef enum {
