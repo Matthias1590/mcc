@@ -7,6 +7,9 @@ void gen_type(type_t type, state_t *state) {
     (void)state;
 
     switch (type.type) {
+    case TYPE_NONE:
+        ERROR("cannot generate type none");
+        exit(1);
     case TYPE_FUNC:
         ERROR("todo: implement");
         exit(1);
@@ -22,7 +25,7 @@ void gen_type(type_t type, state_t *state) {
 
 void gen_param(params_t *param, state_t *state) {
     gen_type(param->type, state);
-    printf(" %%%s", param->name->as_ident.sb->string);
+    printf(" %%var_%s", param->name->as_ident.sb->string);
 }
 
 void gen_stmt(stmt_t *stmt, state_t *state);
@@ -43,7 +46,7 @@ qbe_var_t gen_add(expr_binop_t *add, state_t *state) {
     qbe_var_t rhs = gen_expr(add->rhs, state);
 
     qbe_var_t res = state_alloc_var(state);
-    printf("%%%zu =", res);
+    printf("%%temp_%zu =", res);
 
     type_t res_type;
     type_can_add(add->lhs->cached_type, add->rhs->cached_type, &res_type);
@@ -52,7 +55,7 @@ qbe_var_t gen_add(expr_binop_t *add, state_t *state) {
     state_dealloc_var(state, lhs);
     state_dealloc_var(state, rhs);
 
-    printf(" add %%%zu, %%%zu\n", lhs, rhs);
+    printf(" add %%temp_%zu, %%temp_%zu\n", lhs, rhs);
 
     return res;
 }
@@ -62,29 +65,27 @@ qbe_var_t gen_mult(expr_binop_t *mult, state_t *state) {
     qbe_var_t rhs = gen_expr(mult->rhs, state);
 
     qbe_var_t res = state_alloc_var(state);
-    printf("%%%zu =", res);
+    printf("%%temp_%zu =", res);
 
     type_t res_type;
     type_can_add(mult->lhs->cached_type, mult->rhs->cached_type, &res_type);
     gen_type(res_type, state);
 
+    printf(" mul %%temp_%zu, %%temp_%zu\n", lhs, rhs);
+
     state_dealloc_var(state, lhs);
     state_dealloc_var(state, rhs);
-
-    printf(" mult %%%zu, %%%zu\n", lhs, rhs);
 
     return res;
 }
 
-qbe_var_t gen_var(expr_var_t *var, state_t *state) {
+qbe_var_t gen_var(expr_t *var, state_t *state) {
     qbe_var_t res = state_alloc_var(state);
-    printf("%%%zu =", res);
+    printf("%%temp_%zu =", res);
 
-    type_t res_type;
-    state_get(state, var->var->as_ident.sb->string, &res_type);
-    gen_type(res_type, state);
+    gen_type(var->cached_type, state);
 
-    printf(" copy %%%s\n", var->var->as_ident.sb->string);
+    printf(" copy %%var_%s\n", var->as_var.var->as_ident.sb->string);
 
     return res;
 }
@@ -96,7 +97,7 @@ qbe_var_t gen_expr(expr_t *expr, state_t *state) {
     case EXPR_MULT:
         return gen_mult(&expr->as_binop, state);
     case EXPR_VAR:
-        return gen_var(&expr->as_var, state);
+        return gen_var(expr, state);
     case EXPR_INT:
         ERROR("todo: implement");
         exit(1);
@@ -111,7 +112,7 @@ void gen_return(stmt_return_t *ret, state_t *state) {
     }
 
     qbe_var_t var = gen_expr(ret->value, state);
-    printf("ret %%%zu\n", var);
+    printf("ret %%temp_%zu\n", var);
     state_dealloc_var(state, var);
 }
 
@@ -129,7 +130,7 @@ void gen_stmt(stmt_t *stmt, state_t *state) {
 }
 
 void gen_func_decl(top_func_decl_t *func_decl, state_t *state) {
-    printf("function ");
+    printf("export function ");
     gen_type(func_decl->return_type, state);
     printf(" $%s(", func_decl->name->as_ident.sb->string);
 
@@ -145,7 +146,7 @@ void gen_func_decl(top_func_decl_t *func_decl, state_t *state) {
     }
     printf(") {\n@start\n");
     gen_stmt(func_decl->body, state);
-    printf("}");
+    printf("}\n");
 }
 
 void gen_top(top_t *ast, state_t *state) {
@@ -164,5 +165,4 @@ void gen_code(top_t *ast, state_t *state) {
 
         ast = ast->next;
     }
-    printf("\n");
 }

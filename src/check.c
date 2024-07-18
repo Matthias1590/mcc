@@ -13,6 +13,10 @@ state_t *state_new(void) {
     state->parent = NULL;
     state->var_map = NULL;
 
+    for (size_t i = 0; i < STATE_VAR_COUNT; i++) {
+        state->vars[i] = false;
+    }
+
     return state;
 }
 
@@ -92,6 +96,10 @@ bool state_get(state_t *state, const char *name, type_t *out_type) {
 }
 
 qbe_var_t state_alloc_var(state_t *state) {
+    if (state->parent != NULL) {
+        return state_alloc_var(state->parent);
+    }
+
     for (qbe_var_t var = 0; var < STATE_VAR_COUNT; var++) {
         if (!state->vars[var]) {
             state->vars[var] = true;
@@ -104,6 +112,11 @@ qbe_var_t state_alloc_var(state_t *state) {
 }
 
 void state_dealloc_var(state_t *state, qbe_var_t var) {
+    if (state->parent != NULL) {
+        state_dealloc_var(state->parent, var);
+        return;
+    }
+
     state->vars[var] = false;
 }
 
@@ -238,10 +251,13 @@ bool check_expr(state_t *state, expr_t *expr, type_result_t *type_result) {
     switch (expr->type) {
     case EXPR_ADD:
         res = check_add(state, &expr->as_binop, type_result);
+        break;
     case EXPR_MULT:
         res = check_mult(state, &expr->as_binop, type_result);
+        break;
     case EXPR_VAR:
         res = check_var(state, &expr->as_var, type_result);
+        break;
     case EXPR_INT:
         return true;  // todo: maybe check int bounds? type_result.value_type could be set to the smallest int type needed to contain the literal
     }
