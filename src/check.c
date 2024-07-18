@@ -91,6 +91,22 @@ bool state_get(state_t *state, const char *name, type_t *out_type) {
     return false;
 }
 
+qbe_var_t state_alloc_var(state_t *state) {
+    for (qbe_var_t var = 0; var < STATE_VAR_COUNT; var++) {
+        if (!state->vars[var]) {
+            state->vars[var] = true;
+            return var;
+        }
+    }
+
+    ERROR("ran out of temporary variables while generating code");
+    exit(1);
+}
+
+void state_dealloc_var(state_t *state, qbe_var_t var) {
+    state->vars[var] = false;
+}
+
 bool type_can_be_converted_to(type_t from, type_t to) {
     if (from.type != to.type) {
         return false;
@@ -212,16 +228,20 @@ bool check_var(state_t *state, expr_var_t *var, type_result_t *type_result) {
 }
 
 bool check_expr(state_t *state, expr_t *expr, type_result_t *type_result) {
+    bool res = false;
     switch (expr->type) {
     case EXPR_ADD:
-        return check_add(state, &expr->as_binop, type_result);
+        res = check_add(state, &expr->as_binop, type_result);
     case EXPR_MULT:
-        return check_mult(state, &expr->as_binop, type_result);
+        res = check_mult(state, &expr->as_binop, type_result);
     case EXPR_VAR:
-        return check_var(state, &expr->as_var, type_result);
+        res = check_var(state, &expr->as_var, type_result);
     case EXPR_INT:
         return true;  // todo: maybe check int bounds? type_result.value_type could be set to the smallest int type needed to contain the literal
     }
+
+    expr->cached_type = type_result->value_type;
+    return res;
 }
 
 bool check_return(state_t *state, stmt_return_t ret, type_result_t *type_result) {

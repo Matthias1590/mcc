@@ -3,6 +3,7 @@
 #include "lex.h"
 #include "parse.h"
 #include "check.h"
+#include "qbe.h"
 
 int main(void) {
     tokens_t *tokens = tokens_from_file("test.c");
@@ -29,8 +30,7 @@ int main(void) {
         return 1;
     }
 
-    // code generation
-    // ...
+    gen_code(ast, state);
 
     ast_free(ast);
     tokens_free(tokens);
