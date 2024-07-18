@@ -9,11 +9,11 @@ int main(void) {
         return 1;
     }
 
-    tokens_t *current = tokens;
-    while (current) {
-        printf("%d\n", current->type);
-        current = current->next;
-    }
+    // tokens_t *current = tokens;
+    // while (current) {
+    //     printf("%d\n", current->type);
+    //     current = current->next;
+    // }
 
     top_t *ast = ast_from_tokens(tokens);
 
