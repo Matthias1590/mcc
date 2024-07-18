@@ -211,6 +211,10 @@ void gen_var_decl(stmt_var_decl_t *var_decl, state_t *state) {
 }
 
 void gen_assign(stmt_assign_t *assign, state_t *state) {
+    // todo: writing to a variable that shadows another variable writes to both variables
+    // could be fixed by adding the depth of the variable to its name (if its at the global
+    // scope and is called x then it would be var_0_x)
+
     qbe_var_t expr = gen_expr(assign->value, state);
 
     printf("%%var_%s =", assign->name->as_ident.sb->string);

@@ -17,6 +17,7 @@ typedef struct state_t {
     struct state_t *parent;
     var_map_t *var_map;
     bool vars[STATE_VAR_COUNT];
+    bool is_func_body;
 } state_t;
 
 typedef struct {

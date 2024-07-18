@@ -12,6 +12,7 @@ state_t *state_new(void) {
 
     state->parent = NULL;
     state->var_map = NULL;
+    state->is_func_body = false;
 
     for (size_t i = 0; i < STATE_VAR_COUNT; i++) {
         state->vars[i] = false;
@@ -21,6 +22,11 @@ state_t *state_new(void) {
 }
 
 state_t *state_new_substate(state_t *parent) {
+    if (parent->is_func_body) {
+        parent->is_func_body = false;
+        return parent;
+    }
+
     state_t *substate = state_new();
 
     if (substate != NULL) {
@@ -467,6 +473,7 @@ bool check_func_decl(state_t *state, top_func_decl_t *func_decl) {
         .return_type.type = TYPE_NONE,
         .value_type.type = TYPE_NONE,
     };
+    substate->is_func_body = true;
     if (!check_stmt(substate, func_decl->body, &type_result)) {
         return false;
     }
