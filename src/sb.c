@@ -49,9 +49,11 @@ sb_t *sb_from_file(const char *path) {
     return sb;
 }
 
-void sb_free(sb_t *sb) {
-    free(sb->string);
-    free(sb);
+void sb_free(sb_t **sb) {
+    free((*sb)->string);
+    (*sb)->string = NULL;
+    free(*sb);
+    *sb = NULL;
 }
 
 void sb_add(sb_t *sb, const char *string) {

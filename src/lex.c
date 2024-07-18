@@ -22,6 +22,7 @@ bool lex_ident(tokens_t *current, const char *source, size_t *i) {
     }
 
     if (strcmp(current->as_ident.sb->string, "return") == 0) {
+        sb_free(&current->as_ident.sb);
         current->type = TOKEN_KW_RETURN;
     }
     // todo: add more keywords here
@@ -103,7 +104,7 @@ tokens_t *tokens_from_file(const char *path) {
 
     tokens_t *tokens = tokens_new();
     if (tokens == NULL) {
-        sb_free(sb);
+        sb_free(&sb);
         return NULL;
     }
     tokens_t *current = tokens;
@@ -118,21 +119,21 @@ tokens_t *tokens_from_file(const char *path) {
         }
 
         if (!lex_single(current, sb->string, &i)) {
-            sb_free(sb);
+            sb_free(&sb);
             tokens_free(tokens);
             return NULL;
         }
 
         current->next = tokens_new();
         if (current->next == NULL) {
-            sb_free(sb);
+            sb_free(&sb);
             tokens_free(tokens);
             return NULL;
         }
         current = current->next;
     }
 
-    sb_free(sb);
+    sb_free(&sb);
     return tokens;
 }
 
@@ -154,7 +155,7 @@ void tokens_free(tokens_t *tokens) {
         case TOKEN_KW_RETURN:
             break;
         case TOKEN_IDENT: {
-            sb_free(tokens->as_ident.sb);
+            sb_free(&tokens->as_ident.sb);
         } break;
     }
 

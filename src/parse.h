@@ -3,6 +3,7 @@
 #include "lex.h"
 
 typedef enum {
+    TYPE_NONE,
     TYPE_PRIMITIVE,
     TYPE_FUNC,
 } type_type_t;

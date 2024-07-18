@@ -57,6 +57,8 @@ expr_t *expr_new(void) {
         return NULL;
     }
 
+    expr->cached_type.type = TYPE_NONE;
+
     return expr;
 }
 

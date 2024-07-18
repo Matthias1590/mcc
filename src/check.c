@@ -113,6 +113,8 @@ bool type_can_be_converted_to(type_t from, type_t to) {
     }
 
     switch (from.type) {
+    case TYPE_NONE:
+        return false;
     case TYPE_PRIMITIVE:
         // todo: add promotion stuff, type_can_be_converted_to(int, long) should be true
         return from.as_primitive == to.as_primitive;
@@ -128,6 +130,8 @@ bool type_can_add(type_t lhs, type_t rhs, type_t *out_type) {
     }
 
     switch (lhs.type) {
+    case TYPE_NONE:
+        return false;
     case TYPE_PRIMITIVE:
         // todo: add promotion, same story as in type_can_be_converted_to
         switch (lhs.as_primitive) {
@@ -152,6 +156,8 @@ bool type_can_mult(type_t lhs, type_t rhs, type_t *out_type) {
     }
 
     switch (lhs.type) {
+    case TYPE_NONE:
+        return false;
     case TYPE_PRIMITIVE:
         // todo: add promotion, same story as in type_can_be_converted_to
         switch (lhs.as_primitive) {
