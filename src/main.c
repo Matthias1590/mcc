@@ -17,8 +17,20 @@ int main(void) {
     // }
 
     top_t *ast = ast_from_tokens(tokens);
+    if (ast == NULL) {
+        tokens_free(tokens);
+        return 1;
+    }
 
-    check_ast(ast);
+    state_t *state;
+    if (!check_ast(ast, &state)) {
+        ast_free(ast);
+        tokens_free(tokens);
+        return 1;
+    }
+
+    // code generation
+    // ...
 
     ast_free(ast);
     tokens_free(tokens);

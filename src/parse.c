@@ -21,7 +21,10 @@ top_t *ast_new(void) {
 }
 
 void ast_free(top_t *ast) {
-    free(ast);
+    // todo: switch on type
+
+    // free(ast);
+    (void)ast;
 }
 
 stmt_t *stmt_new(void) {
@@ -32,16 +35,19 @@ stmt_t *stmt_new(void) {
     }
 
     stmt->next = NULL;
+    stmt->type = STMT_NONE;
 
     return stmt;
 }
 
 void stmt_free(stmt_t *stmt) {
+    // todo: switch on type
+
     if (stmt->next) {
         stmt_free(stmt->next);
     }
 
-    free(stmt);
+    // free(stmt);
 }
 
 expr_t *expr_new(void) {
@@ -57,7 +63,8 @@ expr_t *expr_new(void) {
 void expr_free(expr_t *expr) {
     // todo: switch on type
 
-    free(expr);
+    // free(expr);
+    (void)expr;
 }
 
 params_t *params_new(void) {
@@ -68,6 +75,7 @@ params_t *params_new(void) {
     }
 
     params->next = NULL;
+    params->name = NULL;
 
     return params;
 }
@@ -77,7 +85,7 @@ void params_free(params_t *params) {
         params_free(params->next);
     }
 
-    free(params);
+    // free(params);
 }
 
 bool parse_token(token_type_t type, tokens_t **token, tokens_t **tokens) {
@@ -105,6 +113,11 @@ bool parse_type(type_t *type, tokens_t **tokens) {
     if (strcmp(token->as_ident.sb->string, "int") == 0) {
         type->type = TYPE_PRIMITIVE;
         type->as_primitive = PRIMITIVE_INT;
+        return true;
+    }
+    if (strcmp(token->as_ident.sb->string, "void") == 0) {
+        type->type = TYPE_PRIMITIVE;
+        type->as_primitive = PRIMITIVE_VOID;
         return true;
     }
 

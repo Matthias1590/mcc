@@ -10,6 +10,7 @@ typedef enum {
 } expr_type_t;
 
 struct expr_t;
+struct params_t;
 
 typedef struct {
     struct expr_t *lhs;
@@ -29,6 +30,7 @@ typedef struct expr_t {
 } expr_t;
 
 typedef enum {
+    STMT_NONE,
     STMT_BLOCK,
     STMT_RETURN,
 } stmt_type_t;
@@ -54,16 +56,24 @@ typedef struct stmt_t {
 
 typedef enum {
     TYPE_PRIMITIVE,
+    TYPE_FUNC,
 } type_type_t;
 
 typedef enum {
     PRIMITIVE_INT,
+    PRIMITIVE_VOID,
 } type_primitive_t;
 
 typedef struct {
+    struct type_t *return_type;
+    struct params_t *params;
+} type_func_t;
+
+typedef struct type_t {
     type_type_t type;
     union {
         type_primitive_t as_primitive;
+        type_func_t as_func;
     };
 } type_t;
 
