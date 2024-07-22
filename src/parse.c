@@ -5,7 +5,7 @@
 #include <string.h>
 #include "utils.h"
 
-bool parse_stmt(stmt_t *stmt, tokens_t **tokens);
+bool parse_stmt(stmt_t *stmt, tokens_t **tokens, parse_error_t *parse_error);
 
 top_t *ast_new(void) {
     top_t *ast = malloc(sizeof(top_t));
@@ -88,6 +88,15 @@ void params_free(params_t *params) {
     }
 
     // free(params);
+}
+
+void update_parse_error(parse_error_t *parse_error, tokens_t *token, char *message) {
+    if (parse_error->furthest_token != NULL && parse_error->furthest_token->index > token->index) {
+        return;
+    }
+    parse_error->furthest_token = token;
+
+    strncpy(parse_error->message, message, PARSE_ERROR_MESSAGE_LEN - 1);
 }
 
 bool parse_token(token_type_t type, tokens_t **token, tokens_t **tokens) {
@@ -182,7 +191,7 @@ bool parse_params(params_t *params, tokens_t **tokens) {
     return true;
 }
 
-bool parse_term(expr_t **expr, tokens_t **tokens) {
+bool parse_term(expr_t **expr, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     tokens_t *token;
@@ -201,16 +210,17 @@ bool parse_term(expr_t **expr, tokens_t **tokens) {
         return true;
     }
 
+    update_parse_error(parse_error, *tokens, "expected term");
     *tokens = start_token;
     return false;
 }
 
-bool parse_compare_op(expr_t **expr, tokens_t **tokens) {
+bool parse_compare_op(expr_t **expr, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     // try to parse multiplications, lhs = parse_term(), rhs = parse_term()
     expr_t *lhs;
-    if (!parse_term(&lhs, tokens)) {
+    if (!parse_term(&lhs, tokens, parse_error)) {
         *tokens = start_token;
         return false;
     }
@@ -232,7 +242,7 @@ bool parse_compare_op(expr_t **expr, tokens_t **tokens) {
         }
 
         expr_t *rhs;
-        if (!parse_term(&rhs, tokens)) {
+        if (!parse_term(&rhs, tokens, parse_error)) {
             expr_free(lhs);
             *tokens = start_token;
             return false;
@@ -249,12 +259,12 @@ bool parse_compare_op(expr_t **expr, tokens_t **tokens) {
     return true;
 }
 
-bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
+bool parse_mult_op(expr_t **expr, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     // try to parse multiplications, lhs = parse_compare_op(), rhs = parse_compare_op()
     expr_t *lhs;
-    if (!parse_compare_op(&lhs, tokens)) {
+    if (!parse_compare_op(&lhs, tokens, parse_error)) {
         *tokens = start_token;
         return false;
     }
@@ -269,7 +279,7 @@ bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
         }
 
         expr_t *rhs;
-        if (!parse_compare_op(&rhs, tokens)) {
+        if (!parse_compare_op(&rhs, tokens, parse_error)) {
             expr_free(lhs);
             *tokens = start_token;
             return false;
@@ -286,12 +296,12 @@ bool parse_mult_op(expr_t **expr, tokens_t **tokens) {
     return true;
 }
 
-bool parse_add_op(expr_t **expr, tokens_t **tokens) {
+bool parse_add_op(expr_t **expr, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     // try to parse additions, lhs = parse_mult_op(), rhs = parse_mult_op()
     expr_t *lhs;
-    if (!parse_mult_op(&lhs, tokens)) {
+    if (!parse_mult_op(&lhs, tokens, parse_error)) {
         *tokens = start_token;
         return false;
     }
@@ -306,7 +316,7 @@ bool parse_add_op(expr_t **expr, tokens_t **tokens) {
         }
 
         expr_t *rhs;
-        if (!parse_mult_op(&rhs, tokens)) {
+        if (!parse_mult_op(&rhs, tokens, parse_error)) {
             expr_free(lhs);
             *tokens = start_token;
             return false;
@@ -323,14 +333,16 @@ bool parse_add_op(expr_t **expr, tokens_t **tokens) {
     return true;
 }
 
-bool parse_expr(expr_t **expr, tokens_t **tokens) {
-    return parse_add_op(expr, tokens);
+bool parse_expr(expr_t **expr, tokens_t **tokens, parse_error_t *parse_error) {
+    return parse_add_op(expr, tokens, parse_error);
 }
 
-bool parse_block(stmt_t *stmt, tokens_t **tokens) {
+bool parse_block(stmt_t *stmt, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     if (!parse_token(TOKEN_LBRACE, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected left brace");
+
         *tokens = start_token;
         return false;
     }
@@ -340,7 +352,9 @@ bool parse_block(stmt_t *stmt, tokens_t **tokens) {
 
     stmt_t *inner = stmt->as_block.statements;
     while ((*tokens)->type != TOKEN_RBRACE) {
-        if (!parse_stmt(inner, tokens)) {
+        if (!parse_stmt(inner, tokens, parse_error)) {
+            update_parse_error(parse_error, *tokens, "expected statement");
+
             stmt_free(stmt->as_block.statements);
             *tokens = start_token;
             return false;
@@ -351,6 +365,8 @@ bool parse_block(stmt_t *stmt, tokens_t **tokens) {
     }
 
     if (!parse_token(TOKEN_RBRACE, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected closing brace");
+
         stmt_free(stmt->as_block.statements);
         *tokens = start_token;
         return false;
@@ -359,17 +375,19 @@ bool parse_block(stmt_t *stmt, tokens_t **tokens) {
     return true;
 }
 
-bool parse_var_decl(stmt_t *stmt, tokens_t **tokens) {
+bool parse_var_decl(stmt_t *stmt, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     stmt->type = STMT_VAR_DECL;
 
     if (!parse_type(&stmt->as_var_decl.type, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected type");
         *tokens = start_token;
         return false;
     }
 
     if (!parse_token(TOKEN_IDENT, &stmt->as_var_decl.name, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected identifier");
         *tokens = start_token;
         return false;
     }
@@ -377,7 +395,9 @@ bool parse_var_decl(stmt_t *stmt, tokens_t **tokens) {
     stmt->as_var_decl.value = NULL;
 
     if (parse_token(TOKEN_ASSIGN, NULL, tokens)) {
-        if (!parse_expr(&stmt->as_var_decl.value, tokens)) {
+        if (!parse_expr(&stmt->as_var_decl.value, tokens, parse_error)) {
+            update_parse_error(parse_error, *tokens, "expected expression");
+
             expr_free(stmt->as_var_decl.value);
             *tokens = start_token;
             return false;
@@ -385,6 +405,8 @@ bool parse_var_decl(stmt_t *stmt, tokens_t **tokens) {
     }
 
     if (!parse_token(TOKEN_SEMI, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected semicolon");
+
         if (stmt->as_var_decl.value != NULL) {
             expr_free(stmt->as_var_decl.value);
         }
@@ -395,12 +417,14 @@ bool parse_var_decl(stmt_t *stmt, tokens_t **tokens) {
     return true;
 }
 
-bool parse_assign(stmt_t *stmt, tokens_t **tokens) {
+bool parse_assign(stmt_t *stmt, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     stmt->type = STMT_ASSIGN;
 
     if (!parse_token(TOKEN_IDENT, &stmt->as_assign.name, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected identifier");
+
         *tokens = start_token;
         return false;
     }
@@ -408,17 +432,23 @@ bool parse_assign(stmt_t *stmt, tokens_t **tokens) {
     stmt->as_assign.value = NULL;
 
     if (!parse_token(TOKEN_ASSIGN, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected equals sign");
+
         *tokens = start_token;
         return false;
     }
 
-    if (!parse_expr(&stmt->as_assign.value, tokens)) {
+    if (!parse_expr(&stmt->as_assign.value, tokens, parse_error)) {
+        update_parse_error(parse_error, *tokens, "expected expression");
+
         expr_free(stmt->as_assign.value);
         *tokens = start_token;
         return false;
     }
 
     if (!parse_token(TOKEN_SEMI, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected semicolon");
+
         expr_free(stmt->as_assign.value);
         *tokens = start_token;
         return false;
@@ -427,22 +457,28 @@ bool parse_assign(stmt_t *stmt, tokens_t **tokens) {
     return true;
 }
 
-bool parse_return(stmt_t *stmt, tokens_t **tokens) {
+bool parse_return(stmt_t *stmt, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     if (!parse_token(TOKEN_KW_RETURN, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected return keyword");
+
         *tokens = start_token;
         return false;
     }
 
     stmt->type = STMT_RETURN;
 
-    if (!parse_expr(&stmt->as_return.value, tokens)) {
+    if (!parse_expr(&stmt->as_return.value, tokens, parse_error)) {
+        update_parse_error(parse_error, *tokens, "expected expression");
+
         expr_free(stmt->as_return.value);
         stmt->as_return.value = NULL;
     }
 
     if (!parse_token(TOKEN_SEMI, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected semicolon");
+
         if (stmt->as_return.value != NULL) {
             expr_free(stmt->as_return.value);
             stmt->as_return.value = NULL;
@@ -454,57 +490,69 @@ bool parse_return(stmt_t *stmt, tokens_t **tokens) {
     return true;
 }
 
-bool parse_stmt(stmt_t *stmt, tokens_t **tokens) {
-    if (parse_block(stmt, tokens)) {
+bool parse_stmt(stmt_t *stmt, tokens_t **tokens, parse_error_t *parse_error) {
+    if (parse_block(stmt, tokens, parse_error)) {
         return true;
     }
-    if (parse_var_decl(stmt, tokens)) {
+    if (parse_var_decl(stmt, tokens, parse_error)) {
         return true;
     }
-    if (parse_assign(stmt, tokens)) {
+    if (parse_assign(stmt, tokens, parse_error)) {
         return true;
     }
-    if (parse_return(stmt, tokens)) {
+    if (parse_return(stmt, tokens, parse_error)) {
         return true;
     }
     return false;
 }
 
-bool parse_func_decl(top_t *current, tokens_t **tokens) {
+bool parse_func_decl(top_t *current, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
     current->type = TOP_FUNC_DECL;
 
     if (!parse_type(&current->as_func_decl.return_type, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected type");
+
         *tokens = start_token;
         return false;
     }
 
     if (!parse_token(TOKEN_IDENT, &current->as_func_decl.name, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected identifier");
+
         *tokens = start_token;
         return false;
     }
 
     if (!parse_token(TOKEN_LPAR, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected left parenthesis");
+
         *tokens = start_token;
         return false;
     }
 
     current->as_func_decl.params = params_new();
     if (!parse_params(current->as_func_decl.params, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected function parameters");
+
         params_free(current->as_func_decl.params);
         *tokens = start_token;
         return false;
     }
 
     if (!parse_token(TOKEN_RPAR, NULL, tokens)) {
+        update_parse_error(parse_error, *tokens, "expected right parenthesis");
+
         params_free(current->as_func_decl.params);
         *tokens = start_token;
         return false;
     }
 
     current->as_func_decl.body = stmt_new();
-    if (!parse_block(current->as_func_decl.body, tokens)) {
+    if (!parse_block(current->as_func_decl.body, tokens, parse_error)) {
+        update_parse_error(parse_error, *tokens, "expected block");
+
         params_free(current->as_func_decl.params);
         stmt_free(current->as_func_decl.body);
         *tokens = start_token;
@@ -514,14 +562,10 @@ bool parse_func_decl(top_t *current, tokens_t **tokens) {
     return true;
 }
 
-bool parse_top(top_t *current, tokens_t **tokens) {
-    // todo: find out what path went the furthest (token-wise) and then show its error.
-    // if we almost parsed a full function but the last statement was wrong, we should show
-    // the error of the statement parsing, not "expected function declaration"
-
+bool parse_top(top_t *current, tokens_t **tokens, parse_error_t *parse_error) {
     tokens_t *start_token = *tokens;
 
-    if (parse_func_decl(current, tokens)) {
+    if (parse_func_decl(current, tokens, parse_error)) {
         return true;
     }
 
@@ -536,8 +580,15 @@ top_t *ast_from_tokens(tokens_t *tokens) {
     }
     top_t *current = ast;
 
+    parse_error_t parse_error = {0};
     while (tokens->type != TOKEN_EOF) {
-        if (!parse_top(current, &tokens)) {
+        if (!parse_top(current, &tokens, &parse_error)) {
+            if (parse_error.furthest_token != NULL) {
+                ERROR("%s: %s", token_location(parse_error.furthest_token), parse_error.message);
+            } else {
+                ERROR("expected top level declaration");
+            }
+
             ast_free(ast);
             return NULL;
         }

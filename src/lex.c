@@ -142,11 +142,18 @@ tokens_t *tokens_from_file(const char *path) {
         sb_free(&sb);
         return NULL;
     }
+    tokens->index = 0;
     tokens_t *current = tokens;
 
     size_t i = 0;
+    size_t line = 1;
+    size_t column = 0;
     while (sb->string[i] != '\0') {
         while (isspace(sb->string[i])) {
+            if (sb->string[i] == '\n') {
+                line++;
+                column = i + 1;
+            }
             i++;
         }
         if (sb->string[i] == '\0') {
@@ -159,14 +166,23 @@ tokens_t *tokens_from_file(const char *path) {
             return NULL;
         }
 
+        current->file = path;
+        current->line = line;
+        current->column = i - column;
+
         current->next = tokens_new();
         if (current->next == NULL) {
             sb_free(&sb);
             tokens_free(tokens);
             return NULL;
         }
+        current->next->index = current->index + 1;
         current = current->next;
     }
+
+    current->file = path;
+    current->line = line;
+    current->column = i - column + 1;
 
     sb_free(&sb);
     return tokens;
@@ -181,5 +197,13 @@ void tokens_free(tokens_t *tokens) {
         sb_free(&tokens->as_ident.sb);
     }
 
-    free(tokens);
+    // free(tokens);
+}
+
+char *token_location(tokens_t *token) {
+    static char buffer[1024] = {0};
+
+    sprintf(buffer, "%s:%zu:%zu", token->file, token->line, token->column);
+
+    return buffer;
 }

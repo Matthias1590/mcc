@@ -27,7 +27,7 @@ typedef struct {
 
 bool check_ast(top_t *ast, state_t **state);
 
-bool state_get(state_t *state, const char *name, type_t *out_type);
+bool state_get(state_t *state, tokens_t *token, const char *name, type_t *out_type);
 
 qbe_var_t state_alloc_var(state_t *state);
 void state_dealloc_var(state_t *state, qbe_var_t var);

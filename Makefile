@@ -1,5 +1,5 @@
 CC=cc
-CFLAGS=-Wall -Wextra -Werror -I./src -gdwarf-4
+CFLAGS=-Wall -Wextra -Werror -I./src -gdwarf-4 -O0
 
 SRCS=$(wildcard src/*.c)
 OBJS=$(patsubst src/%.c, bin/%.o, $(SRCS))

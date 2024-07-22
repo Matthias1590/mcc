@@ -32,6 +32,10 @@ typedef struct {
 
 typedef struct tokens_t {
     struct tokens_t *next;
+    size_t index;
+    const char *file;
+    size_t line;
+    size_t column;
     token_type_t type;
     union {
         token_ident_t as_ident;
@@ -41,3 +45,5 @@ typedef struct tokens_t {
 
 tokens_t *tokens_from_file(const char *path);
 void tokens_free(tokens_t *tokens);
+
+char *token_location(tokens_t *token);

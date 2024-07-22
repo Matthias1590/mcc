@@ -130,6 +130,13 @@ typedef struct top_t {
     };
 } top_t;
 
+#define PARSE_ERROR_MESSAGE_LEN 256
+
+typedef struct {
+    char message[PARSE_ERROR_MESSAGE_LEN];
+    tokens_t *furthest_token;
+} parse_error_t;
+
 top_t *ast_from_tokens(tokens_t *tokens);
 void ast_free(top_t *ast);
 

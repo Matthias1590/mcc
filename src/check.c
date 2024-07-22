@@ -84,7 +84,7 @@ bool state_add(state_t *state, const char *name, type_t type) {
     return true;
 }
 
-bool state_get(state_t *state, const char *name, type_t *out_type) {
+bool state_get(state_t *state, tokens_t *token, const char *name, type_t *out_type) {
     var_map_t *current = state->var_map;
     while (current != NULL) {
         if (strcmp(current->name, name) == 0) {
@@ -95,10 +95,10 @@ bool state_get(state_t *state, const char *name, type_t *out_type) {
     }
 
     if (state->parent != NULL) {
-        return state_get(state->parent, name, out_type);
+        return state_get(state->parent, token, name, out_type);
     }
 
-    ERROR("variable '%s' not found", name);
+    ERROR("%s: variable '%s' not found", token_location(token), name);
     return false;
 }
 
@@ -340,7 +340,7 @@ bool check_compare_binop(state_t *state, expr_binop_t *binop, type_result_t *typ
 }
 
 bool check_var(state_t *state, expr_var_t *var, type_result_t *type_result) {
-    if (!state_get(state, var->var->as_ident.sb->string, &type_result->value_type)) {
+    if (!state_get(state, var->var, var->var->as_ident.sb->string, &type_result->value_type)) {
         return false;
     }
 
@@ -418,7 +418,7 @@ bool check_var_decl(state_t *state, stmt_var_decl_t var_decl, type_result_t *typ
 }
 
 bool check_assign(state_t *state, stmt_assign_t *assign, type_result_t *type_result) {
-    if (!state_get(state, assign->name->as_ident.sb->string, &assign->cached_type)) {
+    if (!state_get(state, assign->name, assign->name->as_ident.sb->string, &assign->cached_type)) {
         return false;
     }
     if (!check_expr(state, assign->value, type_result)) {
