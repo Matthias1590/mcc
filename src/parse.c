@@ -124,25 +124,30 @@ bool parse_type(type_t *type, tokens_t **tokens) {
     if (strcmp(token->as_ident.sb->string, "int") == 0) {
         type->type = TYPE_PRIMITIVE;
         type->as_primitive = PRIMITIVE_INT;
-        return true;
-    }
-    if (strcmp(token->as_ident.sb->string, "void") == 0) {
+    } else if (strcmp(token->as_ident.sb->string, "char") == 0) {
+        type->type = TYPE_PRIMITIVE;
+        type->as_primitive = PRIMITIVE_CHAR;
+    } else if (strcmp(token->as_ident.sb->string, "void") == 0) {
         type->type = TYPE_PRIMITIVE;
         type->as_primitive = PRIMITIVE_VOID;
-        return true;
-    }
-    if (strcmp(token->as_ident.sb->string, "_Bool") == 0) {
+    } else if (strcmp(token->as_ident.sb->string, "_Bool") == 0) {
         type->type = TYPE_PRIMITIVE;
         type->as_primitive = PRIMITIVE_BOOL;
-        return true;
+    } else {
+        *tokens = start_token;
+        return false;
+    }
+
+    type->pointer_count = 0;
+    while (parse_token(TOKEN_STAR, &token, tokens)) {
+        type->pointer_count += 1;
     }
 
     // i just realized, how am i supposed to parse array types, pointers even...
     // theyre part of the variable name, not the type...
     // todo: figure this out later ^
 
-    *tokens = start_token;
-    return false;
+    return true;
 }
 
 bool parse_param(params_t *params, tokens_t **tokens) {
@@ -614,19 +619,36 @@ top_t *ast_from_tokens(tokens_t *tokens) {
 }
 
 const char *type_to_string(type_t type) {
+    char buffer[1024] = {0};
+
     switch (type.type) {
     case TYPE_NONE:
-        return "none";
+        strcpy(buffer, "none");
+        break;
     case TYPE_FUNC:
-        return "function";
+        strcpy(buffer, "function");
+        break;
     case TYPE_PRIMITIVE:
         switch (type.as_primitive) {
         case PRIMITIVE_INT:
-            return "int";
+            strcpy(buffer, "int");
+            break;
         case PRIMITIVE_VOID:
-            return "void";
+            strcpy(buffer, "void");
+            break;
         case PRIMITIVE_BOOL:
-            return "bool";
+            strcpy(buffer, "bool");
+            break;
+        case PRIMITIVE_CHAR:
+            strcpy(buffer, "char");
+            break;
         }
+        break;
     }
+
+    for (size_t i = 0; i < type.pointer_count; i++) {
+        strcat(buffer, "*");
+    }
+
+    return strdup(buffer);
 }

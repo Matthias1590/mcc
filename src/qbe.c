@@ -6,6 +6,11 @@
 void gen_type(type_t type, state_t *state) {
     (void)state;
 
+    if (type.pointer_count > 0) {
+        printf("l");
+        return;
+    }
+
     switch (type.type) {
     case TYPE_NONE:
         ERROR("cannot generate type none");
@@ -22,10 +27,11 @@ void gen_type(type_t type, state_t *state) {
             exit(1);
             break;
         case PRIMITIVE_INT:
-            printf("w");
+            printf("l");
             break;
+        case PRIMITIVE_CHAR:
         case PRIMITIVE_BOOL:
-            printf("b");
+            printf("w");  // todo: is it possible to make this a byte? qbe doesnt make it look like it
             break;
         }
     }

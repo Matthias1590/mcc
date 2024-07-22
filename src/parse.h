@@ -11,6 +11,7 @@ typedef enum {
 typedef enum {
     PRIMITIVE_INT,
     PRIMITIVE_BOOL,
+    PRIMITIVE_CHAR,
     PRIMITIVE_VOID,
 } type_primitive_t;
 
@@ -20,6 +21,7 @@ typedef struct {
 } type_func_t;
 
 typedef struct type_t {
+    size_t pointer_count;
     type_type_t type;
     union {
         type_primitive_t as_primitive;

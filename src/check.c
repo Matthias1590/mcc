@@ -155,6 +155,7 @@ bool type_is_int_like(type_t type) {
 
     switch (type.as_primitive) {
     case PRIMITIVE_BOOL:
+    case PRIMITIVE_CHAR:
     case PRIMITIVE_INT:
         return true;
     case PRIMITIVE_VOID:
@@ -170,6 +171,7 @@ size_t int_like_type_size(type_t type) {
     switch (type.as_primitive) {
     case PRIMITIVE_VOID:
         return 0;
+    case PRIMITIVE_CHAR:
     case PRIMITIVE_BOOL:
         return 1;
     case PRIMITIVE_INT:
@@ -193,6 +195,7 @@ bool type_is_signed(type_t type) {
     case PRIMITIVE_BOOL:
     case PRIMITIVE_VOID:
         return false;
+    case PRIMITIVE_CHAR:
     case PRIMITIVE_INT:
         return true;
     }
@@ -245,8 +248,9 @@ bool type_can_mult(type_t lhs, type_t rhs, type_t *out_type) {
         switch (lhs.as_primitive) {
         case PRIMITIVE_VOID:
             return false;
+        case PRIMITIVE_CHAR:
         case PRIMITIVE_BOOL:
-            return type_is_int_like(rhs);
+            return type_is_int_like(rhs); // todo(bug): this branch just doesnt set the out type, multiplying by char or bool will break
         case PRIMITIVE_INT:
             if (out_type != NULL) {
                 out_type->type = TYPE_PRIMITIVE;
@@ -273,6 +277,7 @@ bool type_can_compare(type_t lhs, type_t rhs) {
         switch (lhs.as_primitive) {
         case PRIMITIVE_VOID:
             return false;
+        case PRIMITIVE_CHAR:
         case PRIMITIVE_BOOL:
             return type_is_int_like(rhs);
         case PRIMITIVE_INT:
