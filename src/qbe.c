@@ -33,7 +33,7 @@ void gen_type(type_t type, state_t *state) {
 
 void gen_param(params_t *param, state_t *state) {
     gen_type(param->type, state);
-    printf(" %%var_%s", param->name->as_ident.sb->string);
+    printf(" %%var_1_%s", param->name->as_ident.sb->string);
 }
 
 void gen_stmt(stmt_t *stmt, state_t *state);
@@ -141,7 +141,7 @@ qbe_var_t gen_var(expr_t *var, state_t *state) {
 
     gen_type(var->cached_type, state);
 
-    printf(" copy %%var_%s\n", var->as_var.var->as_ident.sb->string);
+    printf(" copy %%var_%zu_%s\n", var->as_var.depth, var->as_var.var->as_ident.sb->string);
 
     return res;
 }
@@ -197,7 +197,7 @@ void gen_var_decl(stmt_var_decl_t *var_decl, state_t *state) {
         expr = gen_expr(var_decl->value, state);
     }
 
-    printf("%%var_%s =", var_decl->name->as_ident.sb->string);
+    printf("%%var_%zu_%s =", var_decl->depth, var_decl->name->as_ident.sb->string);
     gen_type(var_decl->type, state);
     printf(" copy ");
 
@@ -217,7 +217,7 @@ void gen_assign(stmt_assign_t *assign, state_t *state) {
 
     qbe_var_t expr = gen_expr(assign->value, state);
 
-    printf("%%var_%s =", assign->name->as_ident.sb->string);
+    printf("%%var_%zu_%s =", assign->depth, assign->name->as_ident.sb->string);
     gen_type(assign->cached_type, state);
     printf(" copy %%temp_%zu\n", expr);
 

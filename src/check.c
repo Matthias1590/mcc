@@ -102,6 +102,26 @@ bool state_get(state_t *state, tokens_t *token, const char *name, type_t *out_ty
     return false;
 }
 
+size_t state_depth_helper(state_t *state) {
+    if (state->parent == NULL) {
+        return 0;
+    }
+
+    return 1 + state_depth_helper(state->parent);
+}
+
+size_t state_depth(state_t *state, const char *name) {
+    var_map_t *current = state->var_map;
+    while (current != NULL) {
+        if (strcmp(current->name, name) == 0) {
+            return state_depth_helper(state);
+        }
+        current = current->next;
+    }
+
+    return 1 + state_depth(state->parent, name);
+}
+
 qbe_var_t state_alloc_var(state_t *state) {
     if (state->parent != NULL) {
         return state_alloc_var(state->parent);
@@ -344,6 +364,7 @@ bool check_var(state_t *state, expr_var_t *var, type_result_t *type_result) {
         return false;
     }
 
+    var->depth = state_depth(state, var->var->as_ident.sb->string);
     return true;
 }
 
@@ -400,20 +421,21 @@ bool check_return(state_t *state, stmt_return_t ret, type_result_t *type_result)
     return true;
 }
 
-bool check_var_decl(state_t *state, stmt_var_decl_t var_decl, type_result_t *type_result) {
-    if (!state_add(state, var_decl.name->as_ident.sb->string, var_decl.type)) {
+bool check_var_decl(state_t *state, stmt_var_decl_t *var_decl, type_result_t *type_result) {
+    if (!state_add(state, var_decl->name->as_ident.sb->string, var_decl->type)) {
         return false;
     }
-    if (var_decl.value != NULL) {
-        if (!check_expr(state, var_decl.value, type_result)) {
+    if (var_decl->value != NULL) {
+        if (!check_expr(state, var_decl->value, type_result)) {
             return false;
         }
-        if (!type_can_be_converted_to(type_result->value_type, var_decl.type)) {
-            ERROR("variable '%s' is of type '%s' but it's initializer is of type '%s'", var_decl.name->as_ident.sb->string, type_to_string(var_decl.type), type_to_string(type_result->value_type));
+        if (!type_can_be_converted_to(type_result->value_type, var_decl->type)) {
+            ERROR("variable '%s' is of type '%s' but it's initializer is of type '%s'", var_decl->name->as_ident.sb->string, type_to_string(var_decl->type), type_to_string(type_result->value_type));
             return false;
         }
     }
 
+    var_decl->depth = state_depth(state, var_decl->name->as_ident.sb->string);
     return true;
 }
 
@@ -429,6 +451,7 @@ bool check_assign(state_t *state, stmt_assign_t *assign, type_result_t *type_res
         return false;
     }
 
+    assign->depth = state_depth(state, assign->name->as_ident.sb->string);
     return true;
 }
 
@@ -437,7 +460,7 @@ bool check_stmt(state_t *state, stmt_t *stmt, type_result_t *type_result) {
     case STMT_NONE:
         return true;
     case STMT_VAR_DECL:
-       return check_var_decl(state, stmt->as_var_decl, type_result);
+       return check_var_decl(state, &stmt->as_var_decl, type_result);
     case STMT_BLOCK: {
         state_t *substate = state_new_substate(state);
         return check_block(substate, stmt->as_block, type_result);

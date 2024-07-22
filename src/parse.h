@@ -47,6 +47,7 @@ typedef struct {
 
 typedef struct {
     tokens_t *var;
+    size_t depth;
 } expr_var_t;
 
 typedef struct {
@@ -85,12 +86,14 @@ typedef struct {
     type_t type;
     tokens_t *name;
     expr_t *value;
+    size_t depth;
 } stmt_var_decl_t;
 
 typedef struct {
     tokens_t *name; // todo: this should be an "access", "field access", "variable access", "array access", etc., not just a name
     expr_t *value;
     type_t cached_type;
+    size_t depth;
 } stmt_assign_t;
 
 typedef struct stmt_t {
