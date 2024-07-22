@@ -585,6 +585,15 @@ top_t *ast_from_tokens(tokens_t *tokens) {
         if (!parse_top(current, &tokens, &parse_error)) {
             if (parse_error.furthest_token != NULL) {
                 ERROR("%s: %s", token_location(parse_error.furthest_token), parse_error.message);
+
+                /*
+                todo: the program below produces a weird token location:
+                ```
+                int main(int argc, char **argv) {
+                    return 1;
+                }
+                ```
+                */
             } else {
                 ERROR("expected top level declaration");
             }
